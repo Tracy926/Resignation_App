@@ -32,6 +32,13 @@ def normalize_header(value: str) -> str:
 HEADER_ALIASES = {
     "EmpNo": ["empno", "employeeid", "employeecode"],
     "resignation_date": ["resignationdate"],
+    "lastname": [normalize_header("Lastname"), normalize_header("Last Name")],
+    "firstname": [normalize_header("Firstname"), normalize_header("First Name")],
+    "middlename": [normalize_header("Middlename"), normalize_header("Middle Name")],
+    "position_title": [
+        normalize_header("Position_Title"),
+        normalize_header("Position Title"),
+    ],
     # Combined header patterns (old format)
     "deactivation_system_combined": [
         normalize_header("Batch Deactivation from UM and 3rd Party Systems/Apps"),
@@ -74,6 +81,8 @@ REQUIRED_KEYS = ["EmpNo", "resignation_date"]
 class EmployeeRow:
     row_index: int
     EmpNo: str
+    name: str
+    position: str
     resignation_date: date
     can_system: bool
     can_all: bool
@@ -138,7 +147,7 @@ class DeactivationApp:
 
         self.root = tk.Tk()
         self.root.title("Resigned Employee Batch Deactivation")
-        self.root.geometry("900x500")
+        self.root.geometry("1250x500")
 
         self.selection_by_row: Dict[int, str] = {}
 
@@ -208,6 +217,22 @@ class DeactivationApp:
 
         if key == "resignation_date":
             return "resign" in normalized_header and "date" in normalized_header
+
+        if key == "lastname":
+            return "last" in normalized_header and "name" in normalized_header
+
+        if key == "firstname":
+            return "first" in normalized_header and "name" in normalized_header
+
+        if key == "middlename":
+            return "middle" in normalized_header and "name" in normalized_header
+
+        if key == "position_title":
+            return (
+                ("position" in normalized_header and "title" in normalized_header)
+                or "jobtitle" in normalized_header
+                or "designation" in normalized_header
+            )
 
         if key == "deactivation_system_combined":
             return (
@@ -455,10 +480,20 @@ class DeactivationApp:
                 if not can_system and not can_all:
                     continue
 
+                name = self._build_name(row)
+                position_col = self.columns.get("position_title")
+                position = ""
+                if position_col:
+                    position = self._to_text(
+                        self.sheet.cell(row=row, column=position_col).value
+                    )
+
                 due.append(
                     EmployeeRow(
                         row_index=row,
                         EmpNo=str(emp_no_val) if emp_no_val is not None else "",
+                        name=name,
+                        position=position,
                         resignation_date=resignation_date,
                         can_system=can_system,
                         can_all=can_all,
@@ -486,6 +521,24 @@ class DeactivationApp:
                 cell = self.sheet.cell(row=row, column=col)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.font = Font(name="Arial", size=10)
+
+    def _to_text(self, value) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        return str(value).strip()
+
+    def _build_name(self, row_index: int) -> str:
+        parts: List[str] = []
+        for key in ["lastname", "firstname", "middlename"]:
+            col = self.columns.get(key)
+            if not col:
+                continue
+            text = self._to_text(self.sheet.cell(row=row_index, column=col).value)
+            if text:
+                parts.append(text)
+        return " ".join(parts)
 
     def _excel_value_to_date(self, value) -> Optional[date]:
         if value is None:
@@ -584,46 +637,53 @@ class DeactivationApp:
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        header = tk.Frame(scrollable_frame)
-        header.pack(fill=tk.X, pady=(0, 6))
-        tk.Label(
-            header,
-            text="EmpNo",
-            width=22,
-            anchor="w",
-            font=("Segoe UI", 10, "bold"),
-        ).pack(side="left")
-        tk.Label(
-            header,
-            text="Resignation Date",
-            width=18,
-            anchor="w",
-            font=("Segoe UI", 10, "bold"),
-        ).pack(side="left")
-        tk.Label(
-            header,
-            text="Actions",
-            anchor="w",
-            font=("Segoe UI", 10, "bold"),
-        ).pack(side="left")
+        table = tk.Frame(scrollable_frame)
+        table.pack(fill=tk.X, pady=(0, 6))
 
-        for item in self.rows_to_process:
-            row_frame = tk.Frame(scrollable_frame)
-            row_frame.pack(fill=tk.X, pady=2)
+        header_font = ("Segoe UI", 10, "bold")
+        row_font = ("Segoe UI", 10)
+        col_minsizes = [120, 260, 220, 140, 300]
+        for col_idx, minsize in enumerate(col_minsizes):
+            table.grid_columnconfigure(col_idx, minsize=minsize, weight=1)
 
-            tk.Label(row_frame, text=item.EmpNo, width=22, anchor="w").pack(side="left")
+        tk.Label(table, text="EmpNo", anchor="center", font=header_font).grid(
+            row=0, column=0, sticky="ew", padx=4, pady=(0, 6)
+        )
+        tk.Label(table, text="Name", anchor="center", font=header_font).grid(
+            row=0, column=1, sticky="ew", padx=4, pady=(0, 6)
+        )
+        tk.Label(table, text="Position", anchor="center", font=header_font).grid(
+            row=0, column=2, sticky="ew", padx=4, pady=(0, 6)
+        )
+        tk.Label(table, text="Resignation Date", anchor="center", font=header_font).grid(
+            row=0, column=3, sticky="ew", padx=4, pady=(0, 6)
+        )
+        tk.Label(table, text="Actions", anchor="center", font=header_font).grid(
+            row=0, column=4, sticky="ew", padx=4, pady=(0, 6)
+        )
+
+        for row_idx, item in enumerate(self.rows_to_process, start=1):
+            tk.Label(table, text=item.EmpNo, anchor="center", font=row_font).grid(
+                row=row_idx, column=0, sticky="ew", padx=4, pady=2
+            )
+            tk.Label(table, text=item.name, anchor="center", font=row_font).grid(
+                row=row_idx, column=1, sticky="ew", padx=4, pady=2
+            )
+            tk.Label(table, text=item.position, anchor="center", font=row_font).grid(
+                row=row_idx, column=2, sticky="ew", padx=4, pady=2
+            )
             tk.Label(
-                row_frame,
+                table,
                 text=item.resignation_date.isoformat(),
-                width=18,
-                anchor="w",
-            ).pack(side="left")
+                anchor="center",
+                font=row_font,
+            ).grid(row=row_idx, column=3, sticky="ew", padx=4, pady=2)
 
-            btn_holder = tk.Frame(row_frame)
-            btn_holder.pack(side="left")
+            btn_holder = tk.Frame(table)
+            btn_holder.grid(row=row_idx, column=4, pady=2)
 
             status_lbl = tk.Label(btn_holder, text="Pending", width=10, fg="darkorange")
-            status_lbl.pack(side="right", padx=6)
+            status_lbl.pack(side="left", padx=(6, 0))
 
             def update_row_visuals(
                 selected: Optional[str],
@@ -780,7 +840,7 @@ def main():
         default_input = os.path.join(
             os.path.expanduser("~"),
             "Downloads",
-            "Resignations_sample.xlsx",
+            "Summary of Resignations.xlsx",
         )
         if os.path.exists(default_input):
             input_file = default_input
