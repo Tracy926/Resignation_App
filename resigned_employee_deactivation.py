@@ -585,7 +585,7 @@ class DeactivationApp:
         total = len(self.rows_to_process)
         self.status_var.set(f"Processed: {processed}/{total}")
         self.save_button.config(
-            state=tk.NORMAL if processed == total and total > 0 else tk.DISABLED
+            state=tk.NORMAL if processed > 0 else tk.DISABLED
         )
 
     def _build_ui(self):

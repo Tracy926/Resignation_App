@@ -1,5 +1,4 @@
-('C:\\Users\\davea\\OneDrive\\Documents\\MONITORING - '
- 'Copy\\build\\resigned_employee_deactivation\\PYZ-00.pyz',
+('C:\\Users\\davea\\OneDrive\\Documents\\MONITORING_FIXED\\build\\resigned_employee_deactivation\\PYZ-00.pyz',
  [('PIL',
    'C:\\Users\\davea\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),
